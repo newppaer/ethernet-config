@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ethconfig.app.data.ProfileStorage
 import com.ethconfig.app.net.EthernetHelper
+import com.ethconfig.app.net.SshHelper
 import com.ethconfig.app.shell.ShizukuShell
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -30,6 +31,7 @@ class MainViewModel(
 
     private var pingJob: Job? = null
     private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+    private val sshHelper = SshHelper()
 
     init {
         refreshStatus()
@@ -155,6 +157,79 @@ class MainViewModel(
         _uiState.update { it.copy(selectedProfile = profile) }
     }
 
+    // --- SSH Terminal ---
+
+    fun connectSsh(host: String, port: Int, username: String, password: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(sshConnecting = true, sshError = null, sshOutput = emptyList()) }
+            
+            val time = timeFormat.format(Date())
+            _uiState.update { 
+                it.copy(sshOutput = listOf("[$time] 正在连接 $host:$port ...")) 
+            }
+
+            sshHelper.connect(
+                host = host,
+                port = port,
+                username = username,
+                password = password,
+                onOutput = { output ->
+                    val lines = output.split("\n")
+                    _uiState.update { state ->
+                        val newLogs = state.sshOutput + lines.filter { it.isNotBlank() }
+                        state.copy(sshOutput = newLogs.takeLast(500))
+                    }
+                },
+                onError = { error ->
+                    _uiState.update { it.copy(sshError = error, sshConnected = false, sshConnecting = false) }
+                }
+            )
+
+            _uiState.update {
+                it.copy(
+                    sshConnected = sshHelper.isConnected,
+                    sshConnecting = false,
+                    sshHost = host,
+                    sshUsername = username
+                )
+            }
+        }
+    }
+
+    fun sendSshCommand(command: String) {
+        val time = timeFormat.format(Date())
+        _uiState.update { state ->
+            val newLogs = state.sshOutput + listOf("$ $command")
+            state.copy(sshOutput = newLogs.takeLast(500))
+        }
+        sshHelper.sendCommand(command)
+    }
+
+    fun sendSshKey(code: Byte) {
+        sshHelper.sendKey(code)
+    }
+
+    fun disconnectSsh() {
+        sshHelper.disconnect()
+        _uiState.update {
+            it.copy(
+                sshConnected = false,
+                sshConnecting = false,
+                sshHost = "",
+                sshUsername = "",
+                sshOutput = emptyList(),
+                sshError = null,
+                showSsh = false,
+                sshTargetHost = ""
+            )
+        }
+    }
+
+    fun setSshVisible(visible: Boolean, host: String = "") {
+        if (!visible) disconnectSsh()
+        _uiState.update { it.copy(showSsh = visible, sshTargetHost = host) }
+    }
+
     data class UiState(
         val networkStatus: EthernetHelper.NetworkStatus? = null,
         val shizukuAvailable: Boolean = false,
@@ -172,6 +247,15 @@ class MainViewModel(
         val showWebView: Boolean = false,
         val showTools: Boolean = false,
         val lastAction: String = "",
-        val selectedInterface: String? = null
+        val selectedInterface: String? = null,
+        // SSH state
+        val showSsh: Boolean = false,
+        val sshTargetHost: String = "",
+        val sshConnected: Boolean = false,
+        val sshConnecting: Boolean = false,
+        val sshHost: String = "",
+        val sshUsername: String = "",
+        val sshOutput: List<String> = emptyList(),
+        val sshError: String? = null
     )
 }

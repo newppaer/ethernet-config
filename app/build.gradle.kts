@@ -49,5 +49,6 @@ dependencies {
     implementation("dev.rikka.shizuku:api:13.1.5")
     implementation("dev.rikka.shizuku:provider:13.1.5")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("com.jcraft:jsch:0.1.55")
     implementation("com.google.code.gson:gson:2.11.0")
 }

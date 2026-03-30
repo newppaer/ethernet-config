@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.ethconfig.app.net.EthernetHelper
+import com.ethconfig.app.net.SshHelper
 import com.ethconfig.app.ui.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -36,8 +37,9 @@ import com.ethconfig.app.ui.MainViewModel
 fun MainScreen(viewModel: MainViewModel) {
     val state by viewModel.uiState.collectAsState()
 
-    BackHandler(enabled = state.showWebView || state.showTools) {
+    BackHandler(enabled = state.showWebView || state.showTools || state.showSsh) {
         if (state.showWebView) viewModel.setWebViewVisible(false)
+        else if (state.showSsh) viewModel.setSshVisible(false)
         else if (state.showTools) viewModel.setToolsVisible(false)
     }
 
@@ -48,6 +50,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     Text(
                         when {
                             state.showWebView -> "🌍 Web Management"
+                            state.showSsh -> "🔐 SSH Terminal"
                             state.showTools -> "🛠 Toolbox"
                             else -> "🌐 Ethernet Config"
                         },
@@ -55,9 +58,10 @@ fun MainScreen(viewModel: MainViewModel) {
                     ) 
                 },
                 navigationIcon = {
-                    if (state.showWebView || state.showTools) {
+                    if (state.showWebView || state.showTools || state.showSsh) {
                         IconButton(onClick = { 
                             if (state.showWebView) viewModel.setWebViewVisible(false)
+                            else if (state.showSsh) viewModel.setSshVisible(false)
                             else viewModel.setToolsVisible(false)
                         }) {
                             Icon(Icons.Default.ArrowBack, "Back")
@@ -65,7 +69,7 @@ fun MainScreen(viewModel: MainViewModel) {
                     }
                 },
                 actions = {
-                    if (!state.showWebView && !state.showTools) {
+                    if (!state.showWebView && !state.showTools && !state.showSsh) {
                         IconButton(onClick = { viewModel.refreshStatus() }) {
                             Icon(Icons.Default.Refresh, "Refresh")
                         }
@@ -87,6 +91,9 @@ fun MainScreen(viewModel: MainViewModel) {
                     WebViewScreen(
                         url = if (state.managementIp.startsWith("http")) state.managementIp else "http://${state.managementIp}"
                     )
+                }
+                state.showSsh -> {
+                    SshScreen(viewModel, state.sshTargetHost)
                 }
                 state.showTools -> {
                     ToolsScreen(state, viewModel)
@@ -547,15 +554,26 @@ private fun PortScanCard(state: MainViewModel.UiState, viewModel: MainViewModel)
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     state.openPorts.forEach { port ->
-                        val url = if (port == 443) "https://$host" else "http://$host:$port"
-                        SuggestionChip(
-                            onClick = { 
-                                viewModel.setManagementIp(url)
-                                viewModel.setWebViewVisible(true) 
-                            },
-                            label = { Text("PORT $port (${if (port == 443) "HTTPS" else "HTTP"})") },
-                            icon = { Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(14.dp)) }
-                        )
+                        if (port == 22) {
+                            // Port 22 → SSH Terminal
+                            SuggestionChip(
+                                onClick = { 
+                                    viewModel.setSshVisible(true, host)
+                                },
+                                label = { Text("PORT 22 (SSH) 🔐") },
+                                icon = { Icon(Icons.Default.Terminal, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                            )
+                        } else {
+                            val url = if (port == 443) "https://$host" else "http://$host:$port"
+                            SuggestionChip(
+                                onClick = { 
+                                    viewModel.setManagementIp(url)
+                                    viewModel.setWebViewVisible(true) 
+                                },
+                                label = { Text("PORT $port (${if (port == 443) "HTTPS" else "HTTP"})") },
+                                icon = { Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                            )
+                        }
                     }
                 }
             }
