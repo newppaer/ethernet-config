@@ -1,0 +1,177 @@
+package com.ethconfig.app.ui
+
+import android.content.Context
+import android.content.Intent
+import android.provider.Settings
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.ethconfig.app.data.ProfileStorage
+import com.ethconfig.app.net.EthernetHelper
+import com.ethconfig.app.shell.ShizukuShell
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+class MainViewModel(
+    private val context: Context,
+    private val ethernetHelper: EthernetHelper, 
+    private val profileStorage: ProfileStorage
+) : ViewModel() {
+
+    private val _uiState = MutableStateFlow(UiState())
+    val uiState: StateFlow<UiState> = _uiState.asStateFlow()
+
+    private var pingJob: Job? = null
+    private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+
+    init {
+        refreshStatus()
+        _uiState.update { it.copy(profiles = profileStorage.loadProfiles()) }
+    }
+
+    fun refreshStatus() {
+        val status = ethernetHelper.getNetworkStatus()
+        val shizukuOk = ShizukuShell.isAvailable()
+        val shizukuPerm = ShizukuShell.hasPermission()
+        _uiState.update {
+            it.copy(
+                networkStatus = status,
+                shizukuAvailable = shizukuOk,
+                shizukuHasPermission = shizukuPerm,
+                selectedInterface = it.selectedInterface ?: status.interfaceName
+            )
+        }
+    }
+
+    fun requestShizukuPermission() {
+        ShizukuShell.requestPermission(1001)
+    }
+
+    fun setSelectedInterface(iface: String) {
+        _uiState.update { it.copy(selectedInterface = iface) }
+    }
+
+    fun setStaticIp(ip: String, prefixLength: Int, gateway: String, dns: String) {
+        viewModelScope.launch {
+            val iface = _uiState.value.selectedInterface
+            _uiState.update { it.copy(configuring = true, configResult = null) }
+            
+            val result = ethernetHelper.setStaticIp(ip, prefixLength, gateway, dns, iface)
+            
+            if (result.code == "WIFI_REDIRECT") {
+                val intent = Intent(Settings.ACTION_WIFI_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                _uiState.update { it.copy(configuring = false, configResult = result) }
+            } else {
+                _uiState.update {
+                    it.copy(
+                        configuring = false,
+                        configResult = result,
+                        lastAction = if (result.success) "IP已配置: $ip" else "配置失败"
+                    )
+                }
+                if (result.success) {
+                    profileStorage.saveLastConfig(ProfileStorage.IpProfile("last", ip, prefixLength, gateway, dns))
+                    delay(1500)
+                    refreshStatus()
+                }
+            }
+        }
+    }
+
+    fun resetIp() {
+        viewModelScope.launch {
+            val iface = _uiState.value.selectedInterface
+            _uiState.update { it.copy(configuring = true) }
+            val result = ethernetHelper.resetIp(iface)
+            _uiState.update { it.copy(configuring = false, configResult = result) }
+            delay(1500)
+            refreshStatus()
+        }
+    }
+
+    // --- Toolbox Logic ---
+
+    fun startContinuousPing(host: String) {
+        stopContinuousPing()
+        pingJob = viewModelScope.launch {
+            _uiState.update { it.copy(isContinuousPinging = true, pingLogs = emptyList()) }
+            while (true) {
+                val result = ethernetHelper.ping(host)
+                val time = timeFormat.format(Date())
+                val log = if (result.reachable) {
+                    "[$time] Reply from $host: time=${result.timeMs}ms"
+                } else {
+                    "[$time] Request timed out / 请求超时"
+                }
+                _uiState.update { 
+                    val newLogs = (listOf(log) + it.pingLogs).take(100)
+                    it.copy(pingLogs = newLogs) 
+                }
+                delay(1000)
+            }
+        }
+    }
+
+    fun stopContinuousPing() {
+        pingJob?.cancel()
+        pingJob = null
+        _uiState.update { it.copy(isContinuousPinging = false) }
+    }
+
+    fun scanPorts(host: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(scanning = true, openPorts = emptyList()) }
+            val found = ethernetHelper.scanPorts(host)
+            _uiState.update { it.copy(scanning = false, openPorts = found) }
+        }
+    }
+
+    fun setManagementIp(ip: String) {
+        _uiState.update { it.copy(managementIp = ip) }
+        profileStorage.saveLastManagementIp(ip)
+    }
+
+    fun setWebViewVisible(visible: Boolean) {
+        _uiState.update { it.copy(showWebView = visible) }
+    }
+
+    fun setToolsVisible(visible: Boolean) {
+        // If entering tools, also stop ping just in case
+        if (!visible) stopContinuousPing()
+        _uiState.update { it.copy(showTools = visible) }
+    }
+
+    fun selectProfile(profile: ProfileStorage.IpProfile) {
+        _uiState.update { it.copy(selectedProfile = profile) }
+    }
+
+    data class UiState(
+        val networkStatus: EthernetHelper.NetworkStatus? = null,
+        val shizukuAvailable: Boolean = false,
+        val shizukuHasPermission: Boolean = false,
+        val configuring: Boolean = false,
+        val configResult: EthernetHelper.ConfigResult? = null,
+        val isContinuousPinging: Boolean = false,
+        val pingLogs: List<String> = emptyList(),
+        val pingResult: EthernetHelper.PingResult? = null, // Single ping result
+        val scanning: Boolean = false,
+        val openPorts: List<Int> = emptyList(),
+        val profiles: List<ProfileStorage.IpProfile> = emptyList(),
+        val selectedProfile: ProfileStorage.IpProfile? = null,
+        val managementIp: String = "",
+        val showWebView: Boolean = false,
+        val showTools: Boolean = false,
+        val lastAction: String = "",
+        val selectedInterface: String? = null
+    )
+}

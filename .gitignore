@@ -1,0 +1,20 @@
+# Gradle
+.gradle/
+build/
+/app/build/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.DS_Store
+
+# Local configuration
+local.properties
+*.jks
+*.keystore
+
+# Generated
+*.apk
+*.aab
