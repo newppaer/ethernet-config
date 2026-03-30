@@ -209,7 +209,7 @@ private fun SshLoginForm(viewModel: MainViewModel, host: String, state: MainView
                 Spacer(Modifier.width(12.dp))
                 Text("连接中...", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             } else {
-                Icon(Icons.Default.Cast, contentDescription = null)
+                Icon(Icons.Default.PlayArrow, contentDescription = null)
                 Spacer(Modifier.width(8.dp))
                 Text("连接", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
@@ -260,7 +260,7 @@ private fun SshTerminal(state: MainViewModel.UiState, viewModel: MainViewModel) 
                     contentPadding = PaddingValues(horizontal = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(SshHelper.DEFAULT_SHORTCUTS) { shortcut ->
+                    items(SshHelper.Shortcuts.DEFAULT_SHORTCUTS) { shortcut ->
                         SuggestionChip(
                             onClick = {
                                 viewModel.sendSshCommand(shortcut.command)
