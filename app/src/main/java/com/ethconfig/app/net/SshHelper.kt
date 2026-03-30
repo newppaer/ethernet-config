@@ -150,7 +150,7 @@ class SshHelper {
         val command: String
     )
 
-    companion object Shortcuts {
+    object Shortcuts {
         val DEFAULT_SHORTCUTS = listOf(
             SshShortcut("系统信息", "📋", "uname -a && cat /etc/os-release 2>/dev/null | head -5"),
             SshShortcut("磁盘空间", "💾", "df -h"),

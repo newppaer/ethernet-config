@@ -118,7 +118,7 @@ private fun SshLoginForm(viewModel: MainViewModel, host: String, state: MainView
             value = host,
             onValueChange = {},
             label = { Text("主机地址") },
-            leadingIcon = { Icon(Icons.Default.Computer, contentDescription = null) },
+            leadingIcon = { Icon(Icons.Default.Settings, contentDescription = null) },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
             singleLine = true,
@@ -163,7 +163,7 @@ private fun SshLoginForm(viewModel: MainViewModel, host: String, state: MainView
             trailingIcon = {
                 IconButton(onClick = { passwordVisible = !passwordVisible }) {
                     Icon(
-                        if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                        if (passwordVisible) Icons.Default.Lock else Icons.Default.Lock,
                         contentDescription = if (passwordVisible) "隐藏密码" else "显示密码"
                     )
                 }

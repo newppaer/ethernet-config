@@ -561,7 +561,7 @@ private fun PortScanCard(state: MainViewModel.UiState, viewModel: MainViewModel)
                                     viewModel.setSshVisible(true, host)
                                 },
                                 label = { Text("PORT 22 (SSH) 🔐") },
-                                icon = { Icon(Icons.Default.Terminal, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                icon = { Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(14.dp)) }
                             )
                         } else {
                             val url = if (port == 443) "https://$host" else "http://$host:$port"
