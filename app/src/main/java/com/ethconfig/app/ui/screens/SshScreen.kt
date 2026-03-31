@@ -165,10 +165,6 @@ private fun AccountEditorScreen(
         Spacer(Modifier.height(12.dp))
 
         LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(accounts, key = { idx -> idx }) { _ ->
-                // Use indexed access inside items
-            }
-            // Better approach: items with index
             items(accounts.size) { idx ->
                 AccountRow(accounts, idx)
             }
