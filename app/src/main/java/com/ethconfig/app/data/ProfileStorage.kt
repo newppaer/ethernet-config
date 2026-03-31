@@ -47,6 +47,16 @@ class ProfileStorage(private val context: Context) {
         return prefs.getString("last_mgmt_ip", null)
     }
 
+    fun saveQuickCommands(commands: List<String>) {
+        prefs.edit().putString("quick_commands", gson.toJson(commands)).apply()
+    }
+
+    fun loadQuickCommands(): List<String> {
+        val json = prefs.getString("quick_commands", null) ?: return emptyList()
+        val type = object : TypeToken<List<String>>() {}.type
+        return try { gson.fromJson(json, type) ?: emptyList() } catch (e: Exception) { emptyList() }
+    }
+
     private fun defaultProfiles() = listOf(
         IpProfile("Default 192.168.1.x", "192.168.1.248", 24, "192.168.1.1", "192.168.1.1"),
         IpProfile("Default 192.168.0.x", "192.168.0.248", 24, "192.168.0.1", "192.168.0.1"),

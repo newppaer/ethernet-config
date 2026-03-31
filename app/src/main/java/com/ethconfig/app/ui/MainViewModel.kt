@@ -35,7 +35,10 @@ class MainViewModel(
 
     init {
         refreshStatus()
-        _uiState.update { it.copy(profiles = profileStorage.loadProfiles()) }
+        _uiState.update { it.copy(
+            profiles = profileStorage.loadProfiles(),
+            quickCommands = profileStorage.loadQuickCommands()
+        ) }
     }
 
     fun refreshStatus() {
@@ -243,8 +246,13 @@ class MainViewModel(
     }
 
     fun setSshVisible(visible: Boolean, host: String = "") {
-        if (!visible) disconnectSsh()
+        // Don't auto-disconnect - keep connection alive in background
         _uiState.update { it.copy(showSsh = visible, sshTargetHost = host) }
+    }
+
+    fun saveQuickCommands(commands: List<String>) {
+        _uiState.update { it.copy(quickCommands = commands) }
+        profileStorage.saveQuickCommands(commands)
     }
 
     data class UiState(
@@ -255,7 +263,7 @@ class MainViewModel(
         val configResult: EthernetHelper.ConfigResult? = null,
         val isContinuousPinging: Boolean = false,
         val pingLogs: List<String> = emptyList(),
-        val pingResult: EthernetHelper.PingResult? = null, // Single ping result
+        val pingResult: EthernetHelper.PingResult? = null,
         val scanning: Boolean = false,
         val openPorts: List<Int> = emptyList(),
         val profiles: List<ProfileStorage.IpProfile> = emptyList(),
@@ -273,6 +281,7 @@ class MainViewModel(
         val sshHost: String = "",
         val sshUsername: String = "",
         val sshOutput: List<String> = emptyList(),
-        val sshError: String? = null
+        val sshError: String? = null,
+        val quickCommands: List<String> = emptyList()
     )
 }
