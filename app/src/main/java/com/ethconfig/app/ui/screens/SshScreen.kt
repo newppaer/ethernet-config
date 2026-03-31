@@ -283,6 +283,17 @@ private fun SshTerminal(state: MainViewModel.UiState, viewModel: MainViewModel) 
                     Text("⌃C", fontWeight = FontWeight.Bold, fontSize = 13.sp)
                 }
 
+                Spacer(Modifier.width(4.dp))
+
+                FilledTonalButton(
+                    onClick = { viewModel.sendSshKey(9.toByte()) },
+                    modifier = Modifier.height(44.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp)
+                ) {
+                    Text("⇥Tab", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                }
+
                 Spacer(Modifier.width(6.dp))
 
                 OutlinedTextField(

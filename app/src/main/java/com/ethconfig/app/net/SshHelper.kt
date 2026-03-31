@@ -108,13 +108,15 @@ class SshHelper {
      */
     fun sendCommand(command: String): Boolean {
         return try {
-            writer?.let {
-                it.write("$command\n".toByteArray())
-                it.flush()
-                true
-            } ?: false
+            val w = writer ?: return false
+            val bytes = "$command\n".toByteArray()
+            synchronized(w) {
+                w.write(bytes)
+                w.flush()
+            }
+            true
         } catch (e: Exception) {
-            Log.e(TAG, "Send command failed", e)
+            Log.e(TAG, "Send command failed: ${e.message}")
             false
         }
     }
@@ -124,12 +126,14 @@ class SshHelper {
      */
     fun sendKey(code: Byte): Boolean {
         return try {
-            writer?.let {
-                it.write(byteArrayOf(code))
-                it.flush()
-                true
-            } ?: false
+            val w = writer ?: return false
+            synchronized(w) {
+                w.write(byteArrayOf(code))
+                w.flush()
+            }
+            true
         } catch (e: Exception) {
+            Log.e(TAG, "Send key failed: ${e.message}")
             false
         }
     }
