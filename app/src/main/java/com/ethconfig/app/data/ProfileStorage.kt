@@ -47,13 +47,23 @@ class ProfileStorage(private val context: Context) {
         return prefs.getString("last_mgmt_ip", null)
     }
 
-    fun saveQuickCommands(commands: List<String>) {
-        prefs.edit().putString("quick_commands", gson.toJson(commands)).apply()
+    fun saveQuickCommands(groups: List<com.ethconfig.app.ui.MainViewModel.CommandGroup>) {
+        prefs.edit().putString("quick_commands", gson.toJson(groups)).apply()
     }
 
-    fun loadQuickCommands(): List<String> {
+    fun loadQuickCommands(): List<com.ethconfig.app.ui.MainViewModel.CommandGroup> {
         val json = prefs.getString("quick_commands", null) ?: return emptyList()
-        val type = object : TypeToken<List<String>>() {}.type
+        val type = object : TypeToken<List<com.ethconfig.app.ui.MainViewModel.CommandGroup>>() {}.type
+        return try { gson.fromJson(json, type) ?: emptyList() } catch (e: Exception) { emptyList() }
+    }
+
+    fun saveSshAccounts(accounts: List<com.ethconfig.app.ui.MainViewModel.SshAccount>) {
+        prefs.edit().putString("ssh_accounts", gson.toJson(accounts)).apply()
+    }
+
+    fun loadSshAccounts(): List<com.ethconfig.app.ui.MainViewModel.SshAccount> {
+        val json = prefs.getString("ssh_accounts", null) ?: return emptyList()
+        val type = object : TypeToken<List<com.ethconfig.app.ui.MainViewModel.SshAccount>>() {}.type
         return try { gson.fromJson(json, type) ?: emptyList() } catch (e: Exception) { emptyList() }
     }
 

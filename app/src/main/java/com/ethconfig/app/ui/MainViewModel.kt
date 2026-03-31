@@ -37,7 +37,8 @@ class MainViewModel(
         refreshStatus()
         _uiState.update { it.copy(
             profiles = profileStorage.loadProfiles(),
-            quickCommands = profileStorage.loadQuickCommands()
+            quickCommands = profileStorage.loadQuickCommands(),
+            savedAccounts = profileStorage.loadSshAccounts()
         ) }
     }
 
@@ -250,10 +251,18 @@ class MainViewModel(
         _uiState.update { it.copy(showSsh = visible, sshTargetHost = host) }
     }
 
-    fun saveQuickCommands(commands: List<String>) {
+    fun saveQuickCommands(commands: List<CommandGroup>) {
         _uiState.update { it.copy(quickCommands = commands) }
         profileStorage.saveQuickCommands(commands)
     }
+
+    fun saveAccounts(accounts: List<SshAccount>) {
+        _uiState.update { it.copy(savedAccounts = accounts) }
+        profileStorage.saveSshAccounts(accounts)
+    }
+
+    data class CommandGroup(val name: String, val commands: List<String>)
+    data class SshAccount(val label: String, val username: String, val password: String, val port: Int = 22)
 
     data class UiState(
         val networkStatus: EthernetHelper.NetworkStatus? = null,
@@ -282,6 +291,7 @@ class MainViewModel(
         val sshUsername: String = "",
         val sshOutput: List<String> = emptyList(),
         val sshError: String? = null,
-        val quickCommands: List<String> = emptyList()
+        val quickCommands: List<CommandGroup> = emptyList(),
+        val savedAccounts: List<SshAccount> = emptyList()
     )
 }
