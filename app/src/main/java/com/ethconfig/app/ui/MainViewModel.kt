@@ -168,30 +168,47 @@ class MainViewModel(
                 it.copy(sshOutput = listOf("[$time] 正在连接 $host:$port ...")) 
             }
 
-            sshHelper.connect(
-                host = host,
-                port = port,
-                username = username,
-                password = password,
-                onOutput = { output ->
-                    val lines = output.split("\n")
-                    _uiState.update { state ->
-                        val newLogs = state.sshOutput + lines.filter { it.isNotBlank() }
-                        state.copy(sshOutput = newLogs.takeLast(500))
-                    }
-                },
-                onError = { error ->
-                    _uiState.update { it.copy(sshError = error, sshConnected = false, sshConnecting = false) }
+            // 第一步：建立连接
+            val result = sshHelper.connect(host, port, username, password)
+            
+            if (result.success) {
+                // 连接成功，更新状态
+                _uiState.update {
+                    it.copy(
+                        sshConnected = true,
+                        sshConnecting = false,
+                        sshHost = host,
+                        sshUsername = username,
+                        sshOutput = it.sshOutput + listOf("[$time] ✓ 连接成功")
+                    )
                 }
-            )
-
-            _uiState.update {
-                it.copy(
-                    sshConnected = sshHelper.isConnected,
-                    sshConnecting = false,
-                    sshHost = host,
-                    sshUsername = username
-                )
+                
+                // 第二步：在新协程中读取输出（阻塞直到断开）
+                launch {
+                    sshHelper.readOutput(
+                        onOutput = { output ->
+                            val lines = output.split("\n")
+                            _uiState.update { state ->
+                                val newLogs = state.sshOutput + lines.filter { it.isNotBlank() }
+                                state.copy(sshOutput = newLogs.takeLast(500))
+                            }
+                        },
+                        onError = { error ->
+                            _uiState.update { it.copy(sshError = error) }
+                        }
+                    )
+                    // 读取结束 = 连接断开
+                    _uiState.update { it.copy(sshConnected = false) }
+                }
+            } else {
+                // 连接失败
+                _uiState.update {
+                    it.copy(
+                        sshConnecting = false,
+                        sshConnected = false,
+                        sshError = result.error
+                    )
+                }
             }
         }
     }

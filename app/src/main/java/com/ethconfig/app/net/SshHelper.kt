@@ -12,7 +12,7 @@ import java.io.OutputStream
 import java.util.Properties
 
 /**
- * SSH 客户端工具类，基于 JSch 实现
+ * SSH 客户端工具类，基于 JSch (mwiede fork 2.27.x)
  */
 class SshHelper {
 
@@ -26,21 +26,21 @@ class SshHelper {
     private var channel: ChannelShell? = null
     private var reader: BufferedReader? = null
     private var writer: OutputStream? = null
+    @Volatile private var reading = false
 
     val isConnected: Boolean
-        get() = session?.isConnected == true
+        get() = session?.isConnected == true && channel?.isConnected == true
 
     /**
-     * 连接到 SSH 服务器
+     * 连接到 SSH 服务器（不阻塞读取输出）
+     * 返回 true 表示连接成功，false 表示连接失败
      */
     suspend fun connect(
         host: String,
         port: Int = DEFAULT_PORT,
         username: String,
-        password: String,
-        onOutput: (String) -> Unit,
-        onError: (String) -> Unit
-    ): Boolean = withContext(Dispatchers.IO) {
+        password: String
+    ): Result = withContext(Dispatchers.IO) {
         try {
             disconnect()
 
@@ -49,7 +49,6 @@ class SshHelper {
                 setPassword(password)
                 val props = Properties()
                 props["StrictHostKeyChecking"] = "no"
-                // 支持现代密钥交换算法
                 props["kex"] = "curve25519-sha256,curve25519-sha256@libssh.org,ecdh-sha2-nistp256,ecdh-sha2-nistp384,ecdh-sha2-nistp521,diffie-hellman-group-exchange-sha256,diffie-hellman-group16-sha512,diffie-hellman-group18-sha512,diffie-hellman-group14-sha256"
                 props["server_host_key"] = "ssh-ed25519,ecdsa-sha2-nistp256,ecdsa-sha2-nistp384,ecdsa-sha2-nistp521,rsa-sha2-512,rsa-sha2-256,ssh-rsa"
                 props["cipher.s2c"] = "aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr"
@@ -72,30 +71,35 @@ class SshHelper {
             }
 
             Log.d(TAG, "SSH shell channel connected")
-
-            // 读取输出
-            try {
-                val buf = CharArray(4096)
-                while (isConnected) {
-                    val n = reader?.read(buf) ?: -1
-                    if (n > 0) {
-                        onOutput(String(buf, 0, n))
-                    } else if (n == -1) {
-                        break
-                    }
-                }
-            } catch (e: Exception) {
-                if (isConnected) {
-                    onError("读取输出异常: ${e.message}")
-                }
-            }
-
-            true
+            Result(true)
         } catch (e: Exception) {
             Log.e(TAG, "SSH connect failed", e)
-            onError("连接失败: ${e.message}")
             disconnect()
-            false
+            Result(false, e.message ?: "连接失败")
+        }
+    }
+
+    /**
+     * 持续读取输出（必须在 connect 成功后调用，阻塞直到断开）
+     */
+    suspend fun readOutput(onOutput: (String) -> Unit, onError: (String) -> Unit) = withContext(Dispatchers.IO) {
+        reading = true
+        try {
+            val buf = CharArray(4096)
+            while (reading && isConnected) {
+                val n = reader?.read(buf) ?: -1
+                if (n > 0) {
+                    onOutput(String(buf, 0, n))
+                } else if (n == -1) {
+                    break
+                }
+            }
+        } catch (e: Exception) {
+            if (reading && isConnected) {
+                onError("读取异常: ${e.message}")
+            }
+        } finally {
+            reading = false
         }
     }
 
@@ -134,9 +138,10 @@ class SshHelper {
      * 断开连接
      */
     fun disconnect() {
+        reading = false
         try {
-            reader?.close()
             writer?.close()
+            reader?.close()
             channel?.disconnect()
             session?.disconnect()
         } catch (e: Exception) {
@@ -148,9 +153,8 @@ class SshHelper {
         session = null
     }
 
-    /**
-     * SSH 快捷命令预设
-     */
+    data class Result(val success: Boolean, val error: String = "")
+
     data class SshShortcut(
         val label: String,
         val icon: String,
