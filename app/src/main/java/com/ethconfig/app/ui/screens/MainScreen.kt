@@ -611,8 +611,9 @@ private fun PortScanCard(state: MainViewModel.UiState, viewModel: MainViewModel)
                             val url = if (port == 443) "https://$host" else "http://$host:$port"
                             SuggestionChip(
                                 onClick = { 
-                                    viewModel.setManagementIp(url)
-                                    viewModel.setWebViewVisible(true) 
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    viewModel.getContext()?.startActivity(intent)
                                 },
                                 label = { Text("PORT $port (${if (port == 443) "HTTPS" else "HTTP"})") },
                                 icon = { Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(14.dp)) }
@@ -670,8 +671,9 @@ private fun ManagementCard(state: MainViewModel.UiState, viewModel: MainViewMode
                             useHttps -> "https://$url"
                             else -> "http://$url"
                         }
-                        viewModel.setManagementIp(finalUrl)
-                        viewModel.setWebViewVisible(true) 
+                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(finalUrl))
+                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        viewModel.getContext()?.startActivity(intent)
                     },
                     shape = RoundedCornerShape(12.dp)
                 ) {

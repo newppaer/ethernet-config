@@ -322,13 +322,11 @@ private fun SshTerminal(state: MainViewModel.UiState, viewModel: MainViewModel) 
                 OutlinedTextField(value = command, onValueChange = { command = it },
                     placeholder = { Text("command...", fontSize = 13.sp) },
                     modifier = Modifier.weight(1f), shape = RoundedCornerShape(10.dp), singleLine = true,
-                    trailingIcon = { IconButton(onClick = { if (command.isNotBlank()) { viewModel.sendSshCommand(command); command = "" } }, enabled = command.isNotBlank()) { Icon(Icons.AutoMirrored.Filled.Send, "Send") } },
+                    trailingIcon = {
+                        IconButton(onClick = { if (command.isNotBlank()) { viewModel.sendSshCommand(command); command = "" } }, enabled = command.isNotBlank())
+                        { Icon(Icons.AutoMirrored.Filled.Send, "Send") }
+                    },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii))
-                Spacer(Modifier.width(4.dp))
-                FilledTonalButton(onClick = { if (command.isNotBlank()) { viewModel.sendSshCommand(command); command = "" } },
-                    enabled = command.isNotBlank(), modifier = Modifier.height(40.dp),
-                    shape = RoundedCornerShape(8.dp), contentPadding = PaddingValues(horizontal = 10.dp))
-                { Text("↵", fontWeight = FontWeight.Bold, fontSize = 16.sp) }
             }
         }
     }

@@ -33,6 +33,8 @@ class MainViewModel(
     private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
     private val sshHelper = SshHelper()
 
+    fun getContext(): Context = context
+
     init {
         refreshStatus()
         _uiState.update { it.copy(
