@@ -159,35 +159,37 @@ class EthernetHelper(private val context: Context) {
 
         val results = java.util.concurrent.ConcurrentLinkedQueue<HostInfo>()
         val counter = java.util.concurrent.atomic.AtomicInteger(0)
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(32)
 
-        kotlinx.coroutines.coroutineScope {
-            (1..254).map { i ->
-                kotlinx.coroutines.launch {
-                    val ip = "$prefix.$i"
-                    try {
-                        val addr = InetAddress.getByName(ip)
-                        val start = System.currentTimeMillis()
-                        val reachable = addr.isReachable(800)
-                        val rtt = System.currentTimeMillis() - start
-                        if (reachable) {
-                            val services = scanPorts.take(8).mapNotNull { port ->
-                                try {
-                                    Socket().use { s ->
-                                        s.connect(InetSocketAddress(ip, port), 300)
-                                        val type = detectService(s, port)
-                                        ServiceInfo(port, type)
-                                    }
-                                } catch (e: Exception) { null }
-                            }
-                            val hostname = try { addr.canonicalHostName.takeIf { it != ip } } catch (e: Exception) { null }
-                            results.add(HostInfo(ip, rtt, hostname, services))
+        (1..254).forEach { i ->
+            pool.submit {
+                val ip = "$prefix.$i"
+                try {
+                    val addr = InetAddress.getByName(ip)
+                    val start = System.currentTimeMillis()
+                    val reachable = addr.isReachable(800)
+                    val rtt = System.currentTimeMillis() - start
+                    if (reachable) {
+                        val services = scanPorts.take(8).mapNotNull { port ->
+                            try {
+                                Socket().use { s ->
+                                    s.connect(InetSocketAddress(ip, port), 300)
+                                    val type = detectService(s, port)
+                                    ServiceInfo(port, type)
+                                }
+                            } catch (e: Exception) { null }
                         }
-                    } catch (e: Exception) { /* skip */ }
-                    val done = counter.incrementAndGet()
-                    onProgress(done / 254f)
-                }
-            }.forEach { it.join() }
+                        val hostname = try { addr.canonicalHostName.takeIf { it != ip } } catch (e: Exception) { null }
+                        results.add(HostInfo(ip, rtt, hostname, services))
+                    }
+                } catch (e: Exception) { /* skip */ }
+                val done = counter.incrementAndGet()
+                onProgress(done / 254f)
+            }
         }
+
+        pool.shutdown()
+        pool.awaitTermination(60, java.util.concurrent.TimeUnit.SECONDS)
 
         results.sortedBy { it.ip.split(".").last().toIntOrNull() ?: 0 }
     }
