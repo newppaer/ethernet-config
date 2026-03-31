@@ -38,7 +38,8 @@ class MainViewModel(
         _uiState.update { it.copy(
             profiles = profileStorage.loadProfiles(),
             quickCommands = profileStorage.loadQuickCommands(),
-            savedAccounts = profileStorage.loadSshAccounts()
+            savedAccounts = profileStorage.loadSshAccounts(),
+            scanPorts = profileStorage.loadScanPorts()
         ) }
     }
 
@@ -136,10 +137,16 @@ class MainViewModel(
 
     fun scanPorts(host: String) {
         viewModelScope.launch {
+            val ports = _uiState.value.scanPorts
             _uiState.update { it.copy(scanning = true, openPorts = emptyList(), lastScanHost = host) }
-            val found = ethernetHelper.scanPorts(host)
+            val found = ethernetHelper.scanPorts(host, ports)
             _uiState.update { it.copy(scanning = false, openPorts = found) }
         }
+    }
+
+    fun saveScanPorts(ports: List<Int>) {
+        _uiState.update { it.copy(scanPorts = ports) }
+        profileStorage.saveScanPorts(ports)
     }
 
     fun setManagementIp(ip: String) {
@@ -293,6 +300,7 @@ class MainViewModel(
         val sshError: String? = null,
         val quickCommands: List<CommandGroup> = emptyList(),
         val savedAccounts: List<SshAccount> = emptyList(),
-        val lastScanHost: String = ""
+        val lastScanHost: String = "",
+        val scanPorts: List<Int> = listOf(22, 80, 443, 8080, 8443, 5000, 8123)
     )
 }

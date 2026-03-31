@@ -506,6 +506,8 @@ private fun ContinuousPingCard(state: MainViewModel.UiState, viewModel: MainView
 @Composable
 private fun PortScanCard(state: MainViewModel.UiState, viewModel: MainViewModel) {
     var host by remember { mutableStateOf(state.lastScanHost) }
+    var showPorts by remember { mutableStateOf(false) }
+    var portInput by remember { mutableStateOf(state.scanPorts.joinToString(", ")) }
     
     LaunchedEffect(Unit) {
         if (host.isBlank()) {
@@ -518,8 +520,48 @@ private fun PortScanCard(state: MainViewModel.UiState, viewModel: MainViewModel)
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("🔍 Port Scanner", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("🔍 Port Scanner", fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                TextButton(onClick = { showPorts = !showPorts }, contentPadding = PaddingValues(horizontal = 8.dp)) {
+                    Text(if (showPorts) "Hide Ports" else "Ports (${state.scanPorts.size})", fontSize = 12.sp)
+                }
+            }
+
+            // Editable port list
+            if (showPorts) {
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = portInput,
+                    onValueChange = { portInput = it },
+                    label = { Text("Ports (comma separated)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    singleLine = false,
+                    textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace, fontSize = 13.sp),
+                    placeholder = { Text("22, 80, 443, 8080, ...") }
+                )
+                Spacer(Modifier.height(4.dp))
+                Row {
+                    Spacer(Modifier.weight(1f))
+                    Button(
+                        onClick = {
+                            val ports = portInput.split(",", " ", ";")
+                                .map { it.trim().toIntOrNull() }
+                                .filter { it != null && it in 1..65535 }
+                                .map { it!! }
+                                .distinct()
+                            viewModel.saveScanPorts(ports)
+                            portInput = ports.joinToString(", ")
+                            showPorts = false
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) { Text("Save", fontSize = 12.sp) }
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+
+            Spacer(Modifier.height(8.dp))
             
             OutlinedTextField(
                 value = host, 
@@ -541,9 +583,9 @@ private fun PortScanCard(state: MainViewModel.UiState, viewModel: MainViewModel)
                 if (state.scanning) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
                     Spacer(Modifier.width(8.dp))
-                    Text("Scanning Common Ports...")
+                    Text("Scanning...")
                 } else {
-                    Text("Scan Management Ports")
+                    Text("Scan ${state.scanPorts.size} Ports")
                 }
             }
             

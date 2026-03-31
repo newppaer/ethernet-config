@@ -67,6 +67,16 @@ class ProfileStorage(private val context: Context) {
         return try { gson.fromJson(json, type) ?: emptyList() } catch (e: Exception) { emptyList() }
     }
 
+    fun saveScanPorts(ports: List<Int>) {
+        prefs.edit().putString("scan_ports", gson.toJson(ports)).apply()
+    }
+
+    fun loadScanPorts(): List<Int> {
+        val json = prefs.getString("scan_ports", null) ?: return listOf(22, 80, 443, 8080, 8443, 5000, 8123)
+        val type = object : TypeToken<List<Int>>() {}.type
+        return try { gson.fromJson(json, type) ?: listOf(22, 80, 443, 8080, 8443, 5000, 8123) } catch (e: Exception) { listOf(22, 80, 443, 8080, 8443, 5000, 8123) }
+    }
+
     private fun defaultProfiles() = listOf(
         IpProfile("Default 192.168.1.x", "192.168.1.248", 24, "192.168.1.1", "192.168.1.1"),
         IpProfile("Default 192.168.0.x", "192.168.0.248", 24, "192.168.0.1", "192.168.0.1"),

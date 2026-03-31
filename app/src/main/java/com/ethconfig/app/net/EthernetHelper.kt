@@ -132,8 +132,8 @@ class EthernetHelper(private val context: Context) {
         } catch (e: Exception) { PingResult(false, 0, e.message) }
     }
 
-    suspend fun scanPorts(host: String): List<Int> = withContext(Dispatchers.IO) {
-        COMMON_PORTS.filter { port ->
+    suspend fun scanPorts(host: String, ports: List<Int> = COMMON_PORTS): List<Int> = withContext(Dispatchers.IO) {
+        ports.filter { port ->
             try { Socket().use { it.connect(InetSocketAddress(host, port), 500) }; true }
             catch (e: Exception) { false }
         }
