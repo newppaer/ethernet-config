@@ -1,9 +1,9 @@
 package com.ethconfig.app.net
 
 import android.util.Log
-import com.jcraft.jsch.ChannelShell
-import com.jcraft.jsch.JSch
-import com.jcraft.jsch.Session
+import com.github.mwiede.jsch.ChannelShell
+import com.github.mwiede.jsch.JSch
+import com.github.mwiede.jsch.Session
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
