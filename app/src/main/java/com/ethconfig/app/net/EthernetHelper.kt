@@ -7,8 +7,6 @@ import android.net.NetworkCapabilities
 import android.util.Log
 import com.ethconfig.app.shell.ShizukuShell
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 import java.net.InetAddress
 import java.net.InetSocketAddress
@@ -154,7 +152,6 @@ class EthernetHelper(private val context: Context) {
         onProgress: (Float) -> Unit,
         scanPorts: List<Int> = COMMON_PORTS
     ): List<HostInfo> = withContext(Dispatchers.IO) {
-        // Parse subnet like "192.168.1.0/24"
         val base = subnet.replace("/24", "").replace("/16", "").trim()
         val parts = base.split(".")
         if (parts.size != 4) return@withContext emptyList()
@@ -163,10 +160,9 @@ class EthernetHelper(private val context: Context) {
         val results = java.util.concurrent.ConcurrentLinkedQueue<HostInfo>()
         val counter = java.util.concurrent.atomic.AtomicInteger(0)
 
-        // Concurrent ping all 254 IPs
-        (1..254).chunked(32).forEach { chunk ->
-            val jobs = chunk.map { i ->
-                kotlinx.coroutines.async {
+        kotlinx.coroutines.coroutineScope {
+            (1..254).map { i ->
+                kotlinx.coroutines.launch {
                     val ip = "$prefix.$i"
                     try {
                         val addr = InetAddress.getByName(ip)
@@ -174,7 +170,6 @@ class EthernetHelper(private val context: Context) {
                         val reachable = addr.isReachable(800)
                         val rtt = System.currentTimeMillis() - start
                         if (reachable) {
-                            // Quick port scan for open services
                             val services = scanPorts.take(8).mapNotNull { port ->
                                 try {
                                     Socket().use { s ->
@@ -191,8 +186,7 @@ class EthernetHelper(private val context: Context) {
                     val done = counter.incrementAndGet()
                     onProgress(done / 254f)
                 }
-            }
-            jobs.awaitAll()
+            }.forEach { it.join() }
         }
 
         results.sortedBy { it.ip.split(".").last().toIntOrNull() ?: 0 }
