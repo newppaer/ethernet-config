@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
@@ -131,7 +132,7 @@ private fun ToolsScreen(state: MainViewModel.UiState, viewModel: MainViewModel) 
     ) {
         item { ContinuousPingCard(state, viewModel) }
         item { PortScanCard(state, viewModel) }
-        item { ManagementCard(state, viewModel) }
+        item { IpScannerCard(state, viewModel) }
         item { Spacer(modifier = Modifier.height(16.dp)) }
     }
 }
@@ -643,46 +644,91 @@ private fun FlowRow(
 }
 
 @Composable
-private fun ManagementCard(state: MainViewModel.UiState, viewModel: MainViewModel) {
-    var url by remember { mutableStateOf(state.managementIp) }
-    var useHttps by remember { mutableStateOf(false) }
-    
+private fun IpScannerCard(state: MainViewModel.UiState, viewModel: MainViewModel) {
+    var subnet by remember { mutableStateOf(state.scanSubnet) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text("🌍 Web Management Console", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            Text("🌐 IP Scanner", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
-                    value = url, 
-                    onValueChange = { url = it }, 
-                    label = { Text("IP or URL") },
+                    value = subnet,
+                    onValueChange = { subnet = it },
+                    label = { Text("Subnet (x.x.x.0/24)") },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
-                    singleLine = true
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace)
                 )
                 Spacer(Modifier.width(8.dp))
                 Button(
-                    onClick = { 
-                        val finalUrl = when {
-                            url.startsWith("http") -> url
-                            useHttps -> "https://$url"
-                            else -> "http://$url"
-                        }
-                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(finalUrl))
-                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                        viewModel.getContext()?.startActivity(intent)
-                    },
+                    onClick = { viewModel.scanSubnet(subnet) },
+                    enabled = !state.scanningIp && subnet.isNotBlank(),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Open")
+                    if (state.scanningIp) {
+                        CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
+                    } else {
+                        Text("Scan")
+                    }
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
-                Checkbox(checked = useHttps, onCheckedChange = { useHttps = it })
-                Text("Use HTTPS", fontSize = 14.sp)
+
+            if (state.scanningIp) {
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(
+                    progress = { state.scanProgress },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text("${state.scanProgressPercent}%", fontSize = 12.sp, color = Color.Gray)
+            }
+
+            if (state.discoveredHosts.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                Text("${state.discoveredHosts.size} hosts found", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Spacer(Modifier.height(6.dp))
+                LazyColumn(modifier = Modifier.heightIn(max = 300.dp)) {
+                    items(state.discoveredHosts) { host ->
+                        Surface(
+                            color = Color(0xFFF5F5F5),
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(host.ip, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    if (host.hostname != null) {
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(host.hostname, fontSize = 11.sp, color = Color.Gray)
+                                    }
+                                    Spacer(Modifier.weight(1f))
+                                    Text("RTT ${host.rttMs}ms", fontSize = 11.sp, color = Color.Gray)
+                                }
+                                if (host.services.isNotEmpty()) {
+                                    Spacer(Modifier.height(4.dp))
+                                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                        host.services.forEach { svc ->
+                                            val (label, color) = when (svc.type) {
+                                                "SSH" -> "SSH:${svc.port}" to Color(0xFF2E7D32)
+                                                "HTTP" -> "HTTP:${svc.port}" to Color(0xFF1565C0)
+                                                "HTTPS" -> "HTTPS:${svc.port}" to Color(0xFF1565C0)
+                                                else -> "${svc.type}:${svc.port}" to Color.Gray
+                                            }
+                                            Surface(color = color.copy(alpha = 0.15f), shape = RoundedCornerShape(4.dp)) {
+                                                Text(label, fontSize = 10.sp, color = color, fontFamily = FontFamily.Monospace,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

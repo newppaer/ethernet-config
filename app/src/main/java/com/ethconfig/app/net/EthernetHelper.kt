@@ -143,5 +143,84 @@ class EthernetHelper(private val context: Context) {
     data class InterfaceInfo(val name: String, val displayName: String, val isUp: Boolean, val addresses: List<String>, val type: InterfaceType)
     data class ConfigResult(val success: Boolean, val code: String = "", val message: String = "")
     data class PingResult(val reachable: Boolean, val timeMs: Long, val message: String? = null)
+
+    data class ServiceInfo(val port: Int, val type: String)
+    data class HostInfo(val ip: String, val rttMs: Long, val hostname: String? = null, val services: List<ServiceInfo> = emptyList())
+
+    suspend fun scanSubnet(
+        subnet: String,
+        onProgress: (Float) -> Unit,
+        scanPorts: List<Int> = COMMON_PORTS
+    ): List<HostInfo> = withContext(Dispatchers.IO) {
+        // Parse subnet like "192.168.1.0/24"
+        val base = subnet.replace("/24", "").replace("/16", "").trim()
+        val parts = base.split(".")
+        if (parts.size != 4) return@withContext emptyList()
+        val prefix = "${parts[0]}.${parts[1]}.${parts[2]}"
+
+        val results = java.util.concurrent.ConcurrentLinkedQueue<HostInfo>()
+        val counter = java.util.concurrent.atomic.AtomicInteger(0)
+
+        // Concurrent ping all 254 IPs
+        (1..254).chunked(32).forEach { chunk ->
+            val jobs = chunk.map { i ->
+                kotlinx.coroutines.async {
+                    val ip = "$prefix.$i"
+                    try {
+                        val addr = InetAddress.getByName(ip)
+                        val start = System.currentTimeMillis()
+                        val reachable = addr.isReachable(800)
+                        val rtt = System.currentTimeMillis() - start
+                        if (reachable) {
+                            // Quick port scan for open services
+                            val services = scanPorts.take(8).mapNotNull { port ->
+                                try {
+                                    Socket().use { s ->
+                                        s.connect(InetSocketAddress(ip, port), 300)
+                                        val type = detectService(s, port)
+                                        ServiceInfo(port, type)
+                                    }
+                                } catch (e: Exception) { null }
+                            }
+                            val hostname = try { addr.canonicalHostName.takeIf { it != ip } } catch (e: Exception) { null }
+                            results.add(HostInfo(ip, rtt, hostname, services))
+                        }
+                    } catch (e: Exception) { /* skip */ }
+                    val done = counter.incrementAndGet()
+                    onProgress(done / 254f)
+                }
+            }
+            jobs.awaitAll()
+        }
+
+        results.sortedBy { it.ip.split(".").last().toIntOrNull() ?: 0 }
+    }
+
+    private fun detectService(socket: java.net.Socket, port: Int): String {
+        return try {
+            socket.soTimeout = 500
+            val input = socket.getInputStream()
+            // Passive: SSH sends banner immediately
+            val banner = ByteArray(128)
+            val n = try { input.read(banner) } catch (e: Exception) { -1 }
+            if (n > 0) {
+                val text = String(banner, 0, n)
+                if (text.startsWith("SSH-")) return "SSH"
+                if (text.startsWith("HTTP/")) return if (port == 443) "HTTPS" else "HTTP"
+            }
+            // Active: send HTTP probe
+            try {
+                socket.outputStream.write("HEAD / HTTP/1.0\r\nHost: $port\r\n\r\n".toByteArray())
+                socket.outputStream.flush()
+                val resp = ByteArray(128)
+                val m = input.read(resp)
+                if (m > 0) {
+                    val text = String(resp, 0, m)
+                    if (text.startsWith("HTTP/")) return if (port == 443) "HTTPS" else "HTTP"
+                }
+            } catch (e: Exception) { }
+            "OPEN"
+        } catch (e: Exception) { "OPEN" }
+    }
     data class IpPreset(val ip: String, val prefixLength: Int, val gateway: String, val dns: String)
 }

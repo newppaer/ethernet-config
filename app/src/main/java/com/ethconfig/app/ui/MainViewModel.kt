@@ -151,6 +151,39 @@ class MainViewModel(
         profileStorage.saveScanPorts(ports)
     }
 
+    // --- IP Scanner ---
+
+    fun scanSubnet(subnet: String) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(
+                scanningIp = true,
+                scanSubnet = subnet,
+                discoveredHosts = emptyList(),
+                scanProgress = 0f
+            ) }
+            val hosts = ethernetHelper.scanSubnet(subnet) { progress ->
+                _uiState.update { it.copy(scanProgress = progress) }
+            }
+            val discovered = hosts.map { h ->
+                DiscoveredHost(
+                    ip = h.ip,
+                    rttMs = h.rttMs,
+                    hostname = h.hostname,
+                    services = h.services.map { s -> DiscoveredService(s.port, s.type) }
+                )
+            }
+            _uiState.update { it.copy(scanningIp = false, discoveredHosts = discovered, scanProgress = 1f) }
+        }
+    }
+
+    data class DiscoveredHost(
+        val ip: String,
+        val rttMs: Long,
+        val hostname: String? = null,
+        val services: List<DiscoveredService> = emptyList()
+    )
+    data class DiscoveredService(val port: Int, val type: String)
+
     fun setManagementIp(ip: String) {
         _uiState.update { it.copy(managementIp = ip) }
         profileStorage.saveLastManagementIp(ip)
@@ -303,6 +336,13 @@ class MainViewModel(
         val quickCommands: List<CommandGroup> = emptyList(),
         val savedAccounts: List<SshAccount> = emptyList(),
         val lastScanHost: String = "",
-        val scanPorts: List<Int> = listOf(22, 80, 443, 8080, 8443, 5000, 8123)
-    )
+        val scanPorts: List<Int> = listOf(22, 80, 443, 8080, 8443, 5000, 8123),
+        // IP Scanner state
+        val scanSubnet: String = "",
+        val scanningIp: Boolean = false,
+        val scanProgress: Float = 0f,
+        val discoveredHosts: List<DiscoveredHost> = emptyList()
+    ) {
+
+    val scanProgressPercent: Int get() = (scanProgress * 100).toInt()
 }
