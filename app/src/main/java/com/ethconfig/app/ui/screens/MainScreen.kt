@@ -505,10 +505,12 @@ private fun ContinuousPingCard(state: MainViewModel.UiState, viewModel: MainView
 
 @Composable
 private fun PortScanCard(state: MainViewModel.UiState, viewModel: MainViewModel) {
-    var host by remember { mutableStateOf("") }
+    var host by remember { mutableStateOf(state.lastScanHost) }
     
-    LaunchedEffect(state.networkStatus?.gateway) {
-        if (host.isBlank()) host = state.networkStatus?.gateway ?: ""
+    LaunchedEffect(Unit) {
+        if (host.isBlank()) {
+            host = state.networkStatus?.gateway ?: ""
+        }
     }
 
     Card(

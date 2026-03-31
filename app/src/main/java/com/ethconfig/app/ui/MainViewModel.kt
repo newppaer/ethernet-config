@@ -136,7 +136,7 @@ class MainViewModel(
 
     fun scanPorts(host: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(scanning = true, openPorts = emptyList()) }
+            _uiState.update { it.copy(scanning = true, openPorts = emptyList(), lastScanHost = host) }
             val found = ethernetHelper.scanPorts(host)
             _uiState.update { it.copy(scanning = false, openPorts = found) }
         }
@@ -292,6 +292,7 @@ class MainViewModel(
         val sshOutput: List<String> = emptyList(),
         val sshError: String? = null,
         val quickCommands: List<CommandGroup> = emptyList(),
-        val savedAccounts: List<SshAccount> = emptyList()
+        val savedAccounts: List<SshAccount> = emptyList(),
+        val lastScanHost: String = ""
     )
 }
