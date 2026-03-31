@@ -7,6 +7,8 @@ import android.net.NetworkCapabilities
 import android.util.Log
 import com.ethconfig.app.shell.ShizukuShell
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 import java.net.InetAddress
 import java.net.InetSocketAddress

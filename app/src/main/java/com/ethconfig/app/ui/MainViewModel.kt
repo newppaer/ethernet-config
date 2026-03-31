@@ -161,9 +161,9 @@ class MainViewModel(
                 discoveredHosts = emptyList(),
                 scanProgress = 0f
             ) }
-            val hosts = ethernetHelper.scanSubnet(subnet) { progress ->
+            val hosts = ethernetHelper.scanSubnet(subnet, onProgress = { progress ->
                 _uiState.update { it.copy(scanProgress = progress) }
-            }
+            })
             val discovered = hosts.map { h ->
                 DiscoveredHost(
                     ip = h.ip,
@@ -343,6 +343,6 @@ class MainViewModel(
         val scanProgress: Float = 0f,
         val discoveredHosts: List<DiscoveredHost> = emptyList()
     ) {
-
-    val scanProgressPercent: Int get() = (scanProgress * 100).toInt()
+        val scanProgressPercent: Int get() = (scanProgress * 100).toInt()
+    }
 }
