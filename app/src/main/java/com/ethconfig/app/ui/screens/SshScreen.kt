@@ -1,5 +1,6 @@
 package com.ethconfig.app.ui.screens
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -95,6 +96,7 @@ private fun SshLoginForm(viewModel: MainViewModel, host: String, state: MainView
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SshTerminal(state: MainViewModel.UiState, viewModel: MainViewModel) {
     var command by remember { mutableStateOf("") }
