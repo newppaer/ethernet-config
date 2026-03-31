@@ -219,11 +219,11 @@ class MainViewModel(
             val newLogs = state.sshOutput + listOf("$ $command")
             state.copy(sshOutput = newLogs.takeLast(500))
         }
-        sshHelper.sendCommand(command)
+        viewModelScope.launch { sshHelper.sendCommand(command) }
     }
 
     fun sendSshKey(code: Byte) {
-        sshHelper.sendKey(code)
+        viewModelScope.launch { sshHelper.sendKey(code) }
     }
 
     fun disconnectSsh() {

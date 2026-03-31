@@ -106,9 +106,9 @@ class SshHelper {
     /**
      * 发送命令
      */
-    fun sendCommand(command: String): Boolean {
-        return try {
-            val w = writer ?: return false
+    suspend fun sendCommand(command: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val w = writer ?: return@withContext false
             val bytes = "$command\n".toByteArray()
             synchronized(w) {
                 w.write(bytes)
@@ -124,9 +124,9 @@ class SshHelper {
     /**
      * 发送特殊按键
      */
-    fun sendKey(code: Byte): Boolean {
-        return try {
-            val w = writer ?: return false
+    suspend fun sendKey(code: Byte): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val w = writer ?: return@withContext false
             synchronized(w) {
                 w.write(byteArrayOf(code))
                 w.flush()
