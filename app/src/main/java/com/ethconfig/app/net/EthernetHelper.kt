@@ -52,24 +52,26 @@ class EthernetHelper(private val context: Context) {
     }
 
     fun getNetworkStatus(): NetworkStatus {
-        val network = connectivityManager.activeNetwork
-        val caps = connectivityManager.getNetworkCapabilities(network)
-        val linkProps = connectivityManager.getLinkProperties(network)
-        val ifaceName = linkProps?.interfaceName
+        // 获取系统默认的活跃网络属性
+        val activeNetwork = connectivityManager.activeNetwork
+        val activeLinkProps = connectivityManager.getLinkProperties(activeNetwork)
 
-        // Requirement: Connected only if ethX is active
-        val isEthActive = ifaceName?.startsWith("eth") == true
-        val hasIp = linkProps?.linkAddresses?.any { it.address is java.net.Inet4Address } == true
-        val isConnected = isEthActive && (caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true || hasIp)
+        // 尝试寻找以太网接口（即便它不是系统当前的默认网络）
+        val allInterfaces = getAllInterfaces()
+        val ethIface = allInterfaces.find { it.type == InterfaceType.ETHERNET }
+
+        // 重新定义 isConnected:
+        // 只要以太网接口处于 UP 状态且有 IP 地址，我们就认为“以太网已连接”
+        val isConnected = ethIface?.isUp == true
 
         return NetworkStatus(
             connected = isConnected,
-            interfaceName = ifaceName,
-            ipAddress = linkProps?.linkAddresses?.firstOrNull { it.address is java.net.Inet4Address }?.address?.hostAddress,
-            gateway = linkProps?.routes?.firstOrNull { it.isDefaultRoute && it.gateway is java.net.Inet4Address }?.gateway?.hostAddress,
-            dns = linkProps?.dnsServers?.mapNotNull { if (it is java.net.Inet4Address) it.hostAddress else null } ?: emptyList(),
-            linkProperties = linkProps,
-            allInterfaces = getAllInterfaces()
+            interfaceName = ethIface?.name ?: activeLinkProps?.interfaceName,
+            ipAddress = ethIface?.addresses?.firstOrNull() ?: activeLinkProps?.linkAddresses?.firstOrNull { it.address is java.net.Inet4Address }?.address?.hostAddress,
+            gateway = activeLinkProps?.routes?.firstOrNull { it.isDefaultRoute && it.gateway is java.net.Inet4Address }?.gateway?.hostAddress,
+            dns = activeLinkProps?.dnsServers?.mapNotNull { if (it is java.net.Inet4Address) it.hostAddress else null } ?: emptyList(),
+            linkProperties = activeLinkProps,
+            allInterfaces = allInterfaces
         )
     }
 
@@ -81,23 +83,22 @@ class EthernetHelper(private val context: Context) {
         if (getInterfaceType(iface) == InterfaceType.WIFI) return ConfigResult(false, "WIFI_REDIRECT", "Please use System Settings for Wi-Fi")
 
         val commands = buildString {
+            val subnet = ip.substringBeforeLast(".") + ".0"
             // 1. 先尝试删除这个 IP (防止重复设置报错)
+            appendLine("ip rule del priority 1000 2>/dev/null")
+            appendLine("ip rule del priority 1001 2>/dev/null")
             appendLine("ip addr del $ip/$prefixLength dev $iface 2>/dev/null")
+            appendLine("ip route flush table 100 2>/dev/null")
 
             // 2. 将静态 IP 附加到接口上
             appendLine("ip addr add $ip/$prefixLength dev $iface")
+            appendLine("ip rule add to all lookup 100 priority 1000")
+            appendLine("ip rule add from $ip lookup 100 priority 1001")
 
-            // 3. 静态路由设置 (Gateway/Prefix)
-            // 先确保网关在链路层可达，再添加默认网关
-            appendLine("ip route add $gateway dev $iface scope link 2>/dev/null")
-            appendLine("ip route add default via $gateway dev $iface 2>/dev/null")
+            appendLine("ip route add $subnet/$prefixLength dev $iface table 100")
+            appendLine("ip route add default via $gateway dev $iface table 100")
 
-            // 4. 刷新路由缓存
             appendLine("ip route flush cache")
-            
-            // 5. 设置 DNS 属性 (辅助)
-            appendLine("setprop net.dns1 $dns")
-            appendLine("ndc resolver setnetdns $iface \"\" $dns 2>/dev/null")
         }
 
         val result = ShizukuShell.exec(commands)
@@ -109,10 +110,11 @@ class EthernetHelper(private val context: Context) {
         val iface = customInterface ?: getNetworkStatus().interfaceName ?: return ConfigResult(false, "", "No interface")
         val commands = buildString {
             // 清除所有手动设置的 IP 和路由
+            appendLine("ip rule del priority 1000 2>/dev/null")
+            appendLine("ip rule del priority 1001 2>/dev/null")
             appendLine("ip addr flush dev $iface")
             appendLine("ip route flush dev $iface")
-            // 触发系统 DHCP
-            appendLine("ndc interface clearaddrs $iface 2>/dev/null")
+
             appendLine("ip link set $iface down")
             appendLine("sleep 1")
             appendLine("ip link set $iface up")
