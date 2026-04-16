@@ -154,19 +154,29 @@ class EthernetHelper(private val context: Context) {
     data class ServiceInfo(val port: Int, val type: String)
     data class HostInfo(val ip: String, val rttMs: Long, val hostname: String? = null, val services: List<ServiceInfo> = emptyList())
 
+    enum class ScanMode { QUICK, CUSTOM, DEEP }
+
     /**
-     * @param deepScan false = quick scan (COMMON_PORTS), true = full 1-65535 port scan on alive hosts
+     * @param scanMode QUICK = COMMON_PORTS, CUSTOM = user port list, DEEP = 1-65535
+     * @param customPorts user-saved port list (used when scanMode == CUSTOM)
      */
     suspend fun scanSubnet(
         subnet: String,
         onProgress: (Float) -> Unit,
-        scanPorts: List<Int> = COMMON_PORTS,
-        deepScan: Boolean = false
+        scanMode: ScanMode = ScanMode.QUICK,
+        customPorts: List<Int> = COMMON_PORTS
     ): List<HostInfo> = withContext(Dispatchers.IO) {
         val base = subnet.replace("/24", "").replace("/16", "").trim()
         val parts = base.split(".")
         if (parts.size != 4) return@withContext emptyList()
         val prefix = "${parts[0]}.${parts[1]}.${parts[2]}"
+
+        val isDeep = scanMode == ScanMode.DEEP
+        val portList = when (scanMode) {
+            ScanMode.QUICK -> COMMON_PORTS
+            ScanMode.CUSTOM -> customPorts
+            ScanMode.DEEP -> COMMON_PORTS // not used, deepPortScan handles all ports
+        }
 
         val results = java.util.concurrent.ConcurrentLinkedQueue<HostInfo>()
         val counter = java.util.concurrent.atomic.AtomicInteger(0)
@@ -181,11 +191,9 @@ class EthernetHelper(private val context: Context) {
                     val reachable = addr.isReachable(800)
                     val rtt = System.currentTimeMillis() - start
                     if (reachable) {
-                        val services = if (deepScan) {
-                            // Full port scan: 1-65535 with 64 concurrent threads
-                            deepPortScan(ip)
-                        } else {
-                            scanPorts.take(8).mapNotNull { port ->
+                        val services = when (scanMode) {
+                            ScanMode.DEEP -> deepPortScan(ip)
+                            else -> portList.mapNotNull { port ->
                                 try {
                                     Socket().use { s ->
                                         s.connect(InetSocketAddress(ip, port), 300)
@@ -205,7 +213,7 @@ class EthernetHelper(private val context: Context) {
         }
 
         pool.shutdown()
-        pool.awaitTermination(if (deepScan) 300 else 60, java.util.concurrent.TimeUnit.SECONDS)
+        pool.awaitTermination(if (isDeep) 300 else 60, java.util.concurrent.TimeUnit.SECONDS)
 
         results.sortedBy { it.ip.split(".").last().toIntOrNull() ?: 0 }
     }

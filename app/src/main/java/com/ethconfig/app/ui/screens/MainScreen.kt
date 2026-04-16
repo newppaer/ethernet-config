@@ -654,7 +654,7 @@ private fun FlowRow(
 @Composable
 private fun IpScannerCard(state: MainViewModel.UiState, viewModel: MainViewModel) {
     var subnet by remember { mutableStateOf(state.scanSubnet) }
-    var deepScan by remember { mutableStateOf(false) }
+    var scanMode by remember { mutableStateOf(MainViewModel.ScanMode.QUICK) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -675,33 +675,53 @@ private fun IpScannerCard(state: MainViewModel.UiState, viewModel: MainViewModel
                 )
                 Spacer(Modifier.width(8.dp))
                 Button(
-                    onClick = { viewModel.scanSubnet(subnet, deepScan) },
+                    onClick = { viewModel.scanSubnet(subnet, scanMode) },
                     enabled = !state.scanningIp && subnet.isNotBlank(),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     if (state.scanningIp) {
                         CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
                     } else {
-                        Text(if (deepScan) "🔥 Scan" else "Scan")
+                        Text(when (scanMode) {
+                            MainViewModel.ScanMode.QUICK -> "Scan"
+                            MainViewModel.ScanMode.CUSTOM -> "🎯 Scan"
+                            MainViewModel.ScanMode.DEEP -> "🔥 Scan"
+                        })
                     }
                 }
             }
 
-            Spacer(Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Switch(
-                    checked = deepScan,
-                    onCheckedChange = { deepScan = it },
-                    modifier = Modifier.height(24.dp),
+            Spacer(Modifier.height(10.dp))
+            Text("扫描模式", fontSize = 12.sp, color = Color.Gray)
+            Spacer(Modifier.height(4.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = scanMode == MainViewModel.ScanMode.QUICK,
+                    onClick = { scanMode = MainViewModel.ScanMode.QUICK },
+                    label = { Text("快速", fontSize = 12.sp) },
                     enabled = !state.scanningIp
                 )
-                Spacer(Modifier.width(8.dp))
-                Text("🔥 强力扫描", fontSize = 13.sp, fontWeight = if (deepScan) FontWeight.Bold else FontWeight.Normal)
-                if (deepScan) {
-                    Spacer(Modifier.width(6.dp))
-                    Text("(全端口 1-65535)", fontSize = 11.sp, color = Color.Gray)
-                }
+                FilterChip(
+                    selected = scanMode == MainViewModel.ScanMode.CUSTOM,
+                    onClick = { scanMode = MainViewModel.ScanMode.CUSTOM },
+                    label = { Text("🎯 自定义端口 (${state.scanPorts.size})", fontSize = 12.sp) },
+                    enabled = !state.scanningIp
+                )
+                FilterChip(
+                    selected = scanMode == MainViewModel.ScanMode.DEEP,
+                    onClick = { scanMode = MainViewModel.ScanMode.DEEP },
+                    label = { Text("🔥 全端口", fontSize = 12.sp) },
+                    enabled = !state.scanningIp
+                )
             }
+            Text(
+                text = when (scanMode) {
+                    MainViewModel.ScanMode.QUICK -> "扫描 ${EthernetHelper.COMMON_PORTS.size} 个常用端口"
+                    MainViewModel.ScanMode.CUSTOM -> "扫描自定义端口: ${state.scanPorts.joinToString(", ")}"
+                    MainViewModel.ScanMode.DEEP -> "扫描 1-65535 全端口（较慢）"
+                },
+                fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp)
+            )
 
             if (state.scanningIp) {
                 Spacer(Modifier.height(8.dp))
