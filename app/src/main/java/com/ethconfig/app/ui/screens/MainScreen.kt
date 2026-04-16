@@ -589,7 +589,7 @@ private fun PortScanCard(state: MainViewModel.UiState, viewModel: MainViewModel)
                 }
             }
             
-            if (state.openPorts.isNotEmpty()) {
+            if (state.openServices.isNotEmpty()) {
                 Spacer(Modifier.height(12.dp))
                 Text("Open Ports Found:", fontWeight = FontWeight.Bold, fontSize = 14.sp)
                 FlowRow(
@@ -597,27 +597,36 @@ private fun PortScanCard(state: MainViewModel.UiState, viewModel: MainViewModel)
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    state.openPorts.forEach { port ->
-                        if (port == 22) {
-                            // Port 22 → SSH Terminal
-                            SuggestionChip(
-                                onClick = { 
-                                    viewModel.setSshVisible(true, host)
-                                },
-                                label = { Text("PORT 22 (SSH) 🔐") },
-                                icon = { Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(14.dp)) }
-                            )
-                        } else {
-                            val url = if (port == 443) "https://$host" else "http://$host:$port"
-                            SuggestionChip(
-                                onClick = { 
-                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
-                                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    viewModel.getContext()?.startActivity(intent)
-                                },
-                                label = { Text("PORT $port (${if (port == 443) "HTTPS" else "HTTP"})") },
-                                icon = { Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(14.dp)) }
-                            )
+                    state.openServices.forEach { svc ->
+                        when (svc.type) {
+                            "SSH" -> {
+                                SuggestionChip(
+                                    onClick = { 
+                                        viewModel.setSshVisible(true, host)
+                                    },
+                                    label = { Text("${svc.type}:${svc.port} 🔐") },
+                                    icon = { Icon(Icons.Default.Build, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                )
+                            }
+                            "HTTP", "HTTPS" -> {
+                                val url = if (svc.type == "HTTPS" || svc.port == 443) "https://$host:${svc.port}" else "http://$host:${svc.port}"
+                                SuggestionChip(
+                                    onClick = { 
+                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        viewModel.getContext()?.startActivity(intent)
+                                    },
+                                    label = { Text("${svc.type}:${svc.port}") },
+                                    icon = { Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                )
+                            }
+                            else -> {
+                                SuggestionChip(
+                                    onClick = {  },
+                                    label = { Text("${svc.type}:${svc.port}") },
+                                    icon = { Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                )
+                            }
                         }
                     }
                 }
@@ -645,6 +654,7 @@ private fun FlowRow(
 @Composable
 private fun IpScannerCard(state: MainViewModel.UiState, viewModel: MainViewModel) {
     var subnet by remember { mutableStateOf(state.scanSubnet) }
+    var deepScan by remember { mutableStateOf(false) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -665,15 +675,31 @@ private fun IpScannerCard(state: MainViewModel.UiState, viewModel: MainViewModel
                 )
                 Spacer(Modifier.width(8.dp))
                 Button(
-                    onClick = { viewModel.scanSubnet(subnet) },
+                    onClick = { viewModel.scanSubnet(subnet, deepScan) },
                     enabled = !state.scanningIp && subnet.isNotBlank(),
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     if (state.scanningIp) {
                         CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
                     } else {
-                        Text("Scan")
+                        Text(if (deepScan) "🔥 Scan" else "Scan")
                     }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Switch(
+                    checked = deepScan,
+                    onCheckedChange = { deepScan = it },
+                    modifier = Modifier.height(24.dp),
+                    enabled = !state.scanningIp
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("🔥 强力扫描", fontSize = 13.sp, fontWeight = if (deepScan) FontWeight.Bold else FontWeight.Normal)
+                if (deepScan) {
+                    Spacer(Modifier.width(6.dp))
+                    Text("(全端口 1-65535)", fontSize = 11.sp, color = Color.Gray)
                 }
             }
 

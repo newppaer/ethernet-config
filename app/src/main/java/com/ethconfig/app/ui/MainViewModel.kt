@@ -140,9 +140,10 @@ class MainViewModel(
     fun scanPorts(host: String) {
         viewModelScope.launch {
             val ports = _uiState.value.scanPorts
-            _uiState.update { it.copy(scanning = true, openPorts = emptyList(), lastScanHost = host) }
+            _uiState.update { it.copy(scanning = true, openServices = emptyList(), lastScanHost = host) }
             val found = ethernetHelper.scanPorts(host, ports)
-            _uiState.update { it.copy(scanning = false, openPorts = found) }
+            val mapped = found.map { s -> DiscoveredService(s.port, s.type) }
+            _uiState.update { it.copy(scanning = false, openServices = mapped) }
         }
     }
 
@@ -153,17 +154,18 @@ class MainViewModel(
 
     // --- IP Scanner ---
 
-    fun scanSubnet(subnet: String) {
+    fun scanSubnet(subnet: String, deepScan: Boolean = false) {
         viewModelScope.launch {
             _uiState.update { it.copy(
                 scanningIp = true,
                 scanSubnet = subnet,
                 discoveredHosts = emptyList(),
-                scanProgress = 0f
+                scanProgress = 0f,
+                deepScan = deepScan
             ) }
             val hosts = ethernetHelper.scanSubnet(subnet, onProgress = { progress ->
                 _uiState.update { it.copy(scanProgress = progress) }
-            })
+            }, deepScan = deepScan)
             val discovered = hosts.map { h ->
                 DiscoveredHost(
                     ip = h.ip,
@@ -316,7 +318,7 @@ class MainViewModel(
         val pingLogs: List<String> = emptyList(),
         val pingResult: EthernetHelper.PingResult? = null,
         val scanning: Boolean = false,
-        val openPorts: List<Int> = emptyList(),
+        val openServices: List<DiscoveredService> = emptyList(),
         val profiles: List<ProfileStorage.IpProfile> = emptyList(),
         val selectedProfile: ProfileStorage.IpProfile? = null,
         val managementIp: String = "",
@@ -341,7 +343,8 @@ class MainViewModel(
         val scanSubnet: String = "",
         val scanningIp: Boolean = false,
         val scanProgress: Float = 0f,
-        val discoveredHosts: List<DiscoveredHost> = emptyList()
+        val discoveredHosts: List<DiscoveredHost> = emptyList(),
+        val deepScan: Boolean = false
     ) {
         val scanProgressPercent: Int get() = (scanProgress * 100).toInt()
     }

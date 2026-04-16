@@ -134,10 +134,15 @@ class EthernetHelper(private val context: Context) {
         } catch (e: Exception) { PingResult(false, 0, e.message) }
     }
 
-    suspend fun scanPorts(host: String, ports: List<Int> = COMMON_PORTS): List<Int> = withContext(Dispatchers.IO) {
-        ports.filter { port ->
-            try { Socket().use { it.connect(InetSocketAddress(host, port), 500) }; true }
-            catch (e: Exception) { false }
+    suspend fun scanPorts(host: String, ports: List<Int> = COMMON_PORTS): List<ServiceInfo> = withContext(Dispatchers.IO) {
+        ports.mapNotNull { port ->
+            try {
+                Socket().use { s ->
+                    s.connect(InetSocketAddress(host, port), 500)
+                    val type = detectService(s, port)
+                    ServiceInfo(port, type)
+                }
+            } catch (e: Exception) { null }
         }
     }
 
@@ -149,10 +154,14 @@ class EthernetHelper(private val context: Context) {
     data class ServiceInfo(val port: Int, val type: String)
     data class HostInfo(val ip: String, val rttMs: Long, val hostname: String? = null, val services: List<ServiceInfo> = emptyList())
 
+    /**
+     * @param deepScan false = quick scan (COMMON_PORTS), true = full 1-65535 port scan on alive hosts
+     */
     suspend fun scanSubnet(
         subnet: String,
         onProgress: (Float) -> Unit,
-        scanPorts: List<Int> = COMMON_PORTS
+        scanPorts: List<Int> = COMMON_PORTS,
+        deepScan: Boolean = false
     ): List<HostInfo> = withContext(Dispatchers.IO) {
         val base = subnet.replace("/24", "").replace("/16", "").trim()
         val parts = base.split(".")
@@ -172,14 +181,19 @@ class EthernetHelper(private val context: Context) {
                     val reachable = addr.isReachable(800)
                     val rtt = System.currentTimeMillis() - start
                     if (reachable) {
-                        val services = scanPorts.take(8).mapNotNull { port ->
-                            try {
-                                Socket().use { s ->
-                                    s.connect(InetSocketAddress(ip, port), 300)
-                                    val type = detectService(s, port)
-                                    ServiceInfo(port, type)
-                                }
-                            } catch (e: Exception) { null }
+                        val services = if (deepScan) {
+                            // Full port scan: 1-65535 with 64 concurrent threads
+                            deepPortScan(ip)
+                        } else {
+                            scanPorts.take(8).mapNotNull { port ->
+                                try {
+                                    Socket().use { s ->
+                                        s.connect(InetSocketAddress(ip, port), 300)
+                                        val type = detectService(s, port)
+                                        ServiceInfo(port, type)
+                                    }
+                                } catch (e: Exception) { null }
+                            }
                         }
                         val hostname = try { addr.canonicalHostName.takeIf { it != ip } } catch (e: Exception) { null }
                         results.add(HostInfo(ip, rtt, hostname, services))
@@ -191,9 +205,36 @@ class EthernetHelper(private val context: Context) {
         }
 
         pool.shutdown()
-        pool.awaitTermination(60, java.util.concurrent.TimeUnit.SECONDS)
+        pool.awaitTermination(if (deepScan) 300 else 60, java.util.concurrent.TimeUnit.SECONDS)
 
         results.sortedBy { it.ip.split(".").last().toIntOrNull() ?: 0 }
+    }
+
+    /**
+     * Deep scan all 65535 ports on a single host using 64 concurrent threads.
+     * Returns only open ports with detected service type.
+     */
+    private fun deepPortScan(ip: String): List<ServiceInfo> {
+        val results = java.util.concurrent.ConcurrentLinkedQueue<ServiceInfo>()
+        val pool = java.util.concurrent.Executors.newFixedThreadPool(64)
+        val counter = java.util.concurrent.atomic.AtomicInteger(0)
+
+        (1..65535).forEach { port ->
+            pool.submit {
+                try {
+                    Socket().use { s ->
+                        s.connect(InetSocketAddress(ip, port), 200)
+                        val type = detectService(s, port)
+                        results.add(ServiceInfo(port, type))
+                    }
+                } catch (e: Exception) { /* closed */ }
+            }
+        }
+
+        pool.shutdown()
+        pool.awaitTermination(120, java.util.concurrent.TimeUnit.SECONDS)
+
+        return results.sortedBy { it.port }
     }
 
     private fun detectService(socket: java.net.Socket, port: Int): String {
