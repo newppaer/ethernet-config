@@ -154,9 +154,7 @@ class MainViewModel(
 
     // --- IP Scanner ---
 
-    enum class ScanMode { QUICK, CUSTOM, DEEP }
-
-    fun scanSubnet(subnet: String, scanMode: ScanMode = ScanMode.QUICK) {
+    fun scanSubnet(subnet: String, scanMode: EthernetHelper.ScanMode = EthernetHelper.ScanMode.QUICK) {
         viewModelScope.launch {
             _uiState.update { it.copy(
                 scanningIp = true,
@@ -347,7 +345,7 @@ class MainViewModel(
         val scanningIp: Boolean = false,
         val scanProgress: Float = 0f,
         val discoveredHosts: List<DiscoveredHost> = emptyList(),
-        val scanMode: ScanMode = ScanMode.QUICK
+        val scanMode: EthernetHelper.ScanMode = EthernetHelper.ScanMode.QUICK
     ) {
         val scanProgressPercent: Int get() = (scanProgress * 100).toInt()
     }

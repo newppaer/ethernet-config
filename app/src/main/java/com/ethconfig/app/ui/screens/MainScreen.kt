@@ -654,7 +654,7 @@ private fun FlowRow(
 @Composable
 private fun IpScannerCard(state: MainViewModel.UiState, viewModel: MainViewModel) {
     var subnet by remember { mutableStateOf(state.scanSubnet) }
-    var scanMode by remember { mutableStateOf(MainViewModel.ScanMode.QUICK) }
+    var scanMode by remember { mutableStateOf(EthernetHelper.ScanMode.QUICK) }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -683,9 +683,9 @@ private fun IpScannerCard(state: MainViewModel.UiState, viewModel: MainViewModel
                         CircularProgressIndicator(Modifier.size(18.dp), color = Color.White, strokeWidth = 2.dp)
                     } else {
                         Text(when (scanMode) {
-                            MainViewModel.ScanMode.QUICK -> "Scan"
-                            MainViewModel.ScanMode.CUSTOM -> "🎯 Scan"
-                            MainViewModel.ScanMode.DEEP -> "🔥 Scan"
+                            EthernetHelper.ScanMode.QUICK -> "Scan"
+                            EthernetHelper.ScanMode.CUSTOM -> "🎯 Scan"
+                            EthernetHelper.ScanMode.DEEP -> "🔥 Scan"
                         })
                     }
                 }
@@ -696,29 +696,29 @@ private fun IpScannerCard(state: MainViewModel.UiState, viewModel: MainViewModel
             Spacer(Modifier.height(4.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
-                    selected = scanMode == MainViewModel.ScanMode.QUICK,
-                    onClick = { scanMode = MainViewModel.ScanMode.QUICK },
+                    selected = scanMode == EthernetHelper.ScanMode.QUICK,
+                    onClick = { scanMode = EthernetHelper.ScanMode.QUICK },
                     label = { Text("快速", fontSize = 12.sp) },
                     enabled = !state.scanningIp
                 )
                 FilterChip(
-                    selected = scanMode == MainViewModel.ScanMode.CUSTOM,
-                    onClick = { scanMode = MainViewModel.ScanMode.CUSTOM },
+                    selected = scanMode == EthernetHelper.ScanMode.CUSTOM,
+                    onClick = { scanMode = EthernetHelper.ScanMode.CUSTOM },
                     label = { Text("🎯 自定义端口 (${state.scanPorts.size})", fontSize = 12.sp) },
                     enabled = !state.scanningIp
                 )
                 FilterChip(
-                    selected = scanMode == MainViewModel.ScanMode.DEEP,
-                    onClick = { scanMode = MainViewModel.ScanMode.DEEP },
+                    selected = scanMode == EthernetHelper.ScanMode.DEEP,
+                    onClick = { scanMode = EthernetHelper.ScanMode.DEEP },
                     label = { Text("🔥 全端口", fontSize = 12.sp) },
                     enabled = !state.scanningIp
                 )
             }
             Text(
                 text = when (scanMode) {
-                    MainViewModel.ScanMode.QUICK -> "扫描 ${EthernetHelper.COMMON_PORTS.size} 个常用端口"
-                    MainViewModel.ScanMode.CUSTOM -> "扫描自定义端口: ${state.scanPorts.joinToString(", ")}"
-                    MainViewModel.ScanMode.DEEP -> "扫描 1-65535 全端口（较慢）"
+                    EthernetHelper.ScanMode.QUICK -> "扫描 ${EthernetHelper.COMMON_PORTS.size} 个常用端口"
+                    EthernetHelper.ScanMode.CUSTOM -> "扫描自定义端口: ${state.scanPorts.joinToString(", ")}"
+                    EthernetHelper.ScanMode.DEEP -> "扫描 1-65535 全端口（较慢）"
                 },
                 fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp)
             )
