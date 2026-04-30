@@ -188,8 +188,25 @@ class EthernetHelper(private val context: Context) {
                 try {
                     val addr = InetAddress.getByName(ip)
                     val start = System.currentTimeMillis()
-                    val reachable = addr.isReachable(800)
+
+                    // 存活判定：isReachable 或连接端口列表任一成功
+                    val reachable = addr.isReachable(800) || try {
+                        val portsToTry = if (isDeep) listOf(80, 443, 8080) else portList
+                        var portOk = false
+                        for (port in portsToTry) {
+                            try {
+                                Socket().use { s ->
+                                    s.connect(InetSocketAddress(ip, port), 200)
+                                    portOk = true
+                                }
+                                if (portOk) break
+                            } catch (e: Exception) { /* try next port */ }
+                        }
+                        portOk
+                    } catch (e: Exception) { false }
+
                     val rtt = System.currentTimeMillis() - start
+
                     if (reachable) {
                         val services = when (scanMode) {
                             ScanMode.DEEP -> deepPortScan(ip)
