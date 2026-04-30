@@ -685,7 +685,6 @@ private fun IpScannerCard(state: MainViewModel.UiState, viewModel: MainViewModel
                         Text(when (scanMode) {
                             EthernetHelper.ScanMode.QUICK -> "Scan"
                             EthernetHelper.ScanMode.CUSTOM -> "🎯 Scan"
-                            EthernetHelper.ScanMode.DEEP -> "🔥 Scan"
                         })
                     }
                 }
@@ -707,18 +706,11 @@ private fun IpScannerCard(state: MainViewModel.UiState, viewModel: MainViewModel
                     label = { Text("🎯 自定义端口 (${state.scanPorts.size})", fontSize = 12.sp) },
                     enabled = !state.scanningIp
                 )
-                FilterChip(
-                    selected = scanMode == EthernetHelper.ScanMode.DEEP,
-                    onClick = { scanMode = EthernetHelper.ScanMode.DEEP },
-                    label = { Text("🔥 全端口", fontSize = 12.sp) },
-                    enabled = !state.scanningIp
-                )
             }
             Text(
                 text = when (scanMode) {
-                    EthernetHelper.ScanMode.QUICK -> "扫描 ${EthernetHelper.COMMON_PORTS.size} 个常用端口"
-                    EthernetHelper.ScanMode.CUSTOM -> "扫描自定义端口: ${state.scanPorts.joinToString(", ")}"
-                    EthernetHelper.ScanMode.DEEP -> "扫描 1-65535 全端口（较慢）"
+                    EthernetHelper.ScanMode.QUICK -> "扫描 ${EthernetHelper.COMMON_PORTS.size} 个常用端口（存活判定也用这些端口）"
+                    EthernetHelper.ScanMode.CUSTOM -> "扫描自定义端口: ${state.scanPorts.joinToString(", ")}（存活判定也用这些端口）"
                 },
                 fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp)
             )
